@@ -476,12 +476,16 @@ class RVCSetup:
             logger.warning(f"Could not adjust pip version: {e}")
 
     def _patch_requirements_for_py311(self, requirements_file: Path) -> None:
-        """Patch requirements.txt for Python 3.11 compatibility (numba, llvmlite)."""
+        """Patch requirements.txt for Python 3.11 compatibility (numba, llvmlite, pyworld)."""
         try:
             content = requirements_file.read_text(encoding="utf-8")
             original = content
             content = content.replace("numba==0.56.4", "numba>=0.57.0")
             content = content.replace("llvmlite==0.39.0", "llvmlite>=0.40.0")
+            # pyworld 0.3.2 no tiene wheel para Python 3.11 en Windows; usar pyworld-prebuilt
+            if sys.platform == "win32" and "pyworld==" in content:
+                content = content.replace("pyworld==0.3.2", "pyworld-prebuilt>=0.3.0")
+                logger.info("Patched pyworld -> pyworld-prebuilt (no C++ build needed)")
             if content != original:
                 requirements_file.write_text(content, encoding="utf-8")
                 logger.info("Patched requirements.txt for Python 3.11 compatibility")

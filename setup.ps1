@@ -71,7 +71,20 @@ Write-Step "Instalando dependencias basicas (pydub, numpy, scipy)..."
 & $pythonCmd -m pip install pydub flask numpy scipy -q
 Write-Ok "Dependencias basicas instaladas"
 
-# 5. RVC setup (torch, fairseq, etc. - PUEDE TARDAR 15-40 MIN)
+# 5. C++ Build Tools (necesario para fairseq en Windows)
+Write-Step "Comprobando Microsoft C++ Build Tools..."
+$vctoolsPath = "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Tools\MSVC"
+$vctools = Test-Path $vctoolsPath
+if (-not $vctools) {
+    Write-Warn "C++ Build Tools no encontrados (necesarios para fairseq)."
+    Write-Host "  Ejecuta como Admin: INSTALAR_CPP_BUILD_TOOLS.bat" -ForegroundColor Yellow
+    Write-Host "  O descarga: https://visualstudio.microsoft.com/visual-cpp-build-tools/" -ForegroundColor Cyan
+    Write-Host "  Luego abre una NUEVA terminal y vuelve a ejecutar este setup." -ForegroundColor Yellow
+} else {
+    Write-Ok "C++ Build Tools listos"
+}
+
+# 6. RVC setup (torch, fairseq, etc. - PUEDE TARDAR 15-40 MIN)
 Write-Step "Configurando RVC (torch, modelos... 15-40 min la primera vez)"
 Write-Host "  Si parece colgado, espera: torch tarda 10+ min en descargar." -ForegroundColor Yellow
 $RvcPath = Join-Path $ProjectRoot "rvc-no-gui"
@@ -85,13 +98,10 @@ if (-not (Test-Path (Join-Path $RvcPath "pipeline.py"))) {
     # Usar Start-Process para evitar NativeCommandError cuando Python escribe a stderr
     $p = Start-Process -FilePath $pythonCmd -ArgumentList "pipeline.py","setup" -WorkingDirectory $RvcPath -Wait -NoNewWindow -PassThru
     if ($p.ExitCode -ne 0) {
-        Write-Warn "RVC setup fallo. Instalando dependencias RVC manualmente..."
-        $rvcReq = Join-Path $RvcPath "RVC\requirements.txt"
-        if (Test-Path $rvcReq) {
-            & $pythonCmd -m pip install -r $rvcReq -q 2>$null
-            Write-Ok "Dependencias RVC instaladas"
-        }
-        Write-Warn "Ejecuta manualmente si hay mas errores: cd rvc-no-gui; python pipeline.py setup"
+        Write-Warn "RVC setup fallo. Revisa los errores arriba."
+        Write-Host "  Solucion: Instala C++ Build Tools desde:" -ForegroundColor Yellow
+        Write-Host "  https://visualstudio.microsoft.com/visual-cpp-build-tools/" -ForegroundColor Cyan
+        Write-Host "  Luego ejecuta: cd rvc-no-gui; python pipeline.py setup" -ForegroundColor Yellow
     } else {
         Write-Ok "RVC configurado"
     }

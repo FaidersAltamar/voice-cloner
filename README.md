@@ -8,7 +8,12 @@ Sube muestras de audio (MP3 o WAV) y obtén tu modelo **.pth** + **.index** para
 
 **Doble clic en `INSTALAR_Y_EJECUTAR.bat`**
 
-Instala automáticamente Python, Git, FFmpeg (si faltan), dependencias y modelos RVC. La primera vez puede tardar 5-15 min.
+Instala automáticamente Python, Git, FFmpeg (si faltan), dependencias y modelos RVC. La primera vez puede tardar 15-40 min.
+
+**Si falla con "Microsoft Visual C++ 14.0 required":**
+1. Ejecuta como **Administrador**: `INSTALAR_CPP_BUILD_TOOLS.bat`
+2. Espera a que termine (5-15 min)
+3. Abre una **nueva** terminal y vuelve a ejecutar `INSTALAR_Y_EJECUTAR.bat`
 
 ---
 
