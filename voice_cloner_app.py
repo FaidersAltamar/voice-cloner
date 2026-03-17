@@ -72,6 +72,16 @@ def find_output_files(model_name: str) -> tuple[Path | None, Path | None]:
                 except (IndexError, ValueError):
                     return 0
             pth_file = max(g_files, key=_epoch_num)
+    # 4. Fallback: buscar en todo RVC (por si la estructura cambió)
+    if not pth_file and rvc_base.exists():
+        candidates = [f for f in rvc_base.rglob("G_*.pth") if model_name in str(f)]
+        if candidates:
+            def _epoch_num(p: Path) -> int:
+                try:
+                    return int(p.stem.split("_")[1])
+                except (IndexError, ValueError):
+                    return 0
+            pth_file = max(candidates, key=_epoch_num)
 
     # .index: preferir added_* sobre trained_* (added es el que usa inference)
     index_file = None
@@ -163,6 +173,14 @@ def run_training(model_name: str, wav_files: list[Path], epochs: int, use_gpu: b
                 on_error(f"Entrenamiento falló (código {proc.returncode})")
                 return
             pth, idx = find_output_files(model_name)
+            # Si hay .index pero no .pth, intentar convertir checkpoint (savee puede haber fallado)
+            if idx and not pth:
+                on_progress("Convirtiendo checkpoint a .pth...")
+                subprocess.run(
+                    ["python", str(pipeline), "ensure-weights", "-m", model_name],
+                    cwd=str(RVC_DIR), capture_output=True, timeout=60
+                )
+                pth, idx = find_output_files(model_name)
             if pth:
                 dest = OUTPUT_DIR / f"{model_name}_{job_id}.pth"
                 shutil.copy(pth, dest)
@@ -335,7 +353,11 @@ class VoiceClonerApp:
             self._log(f"  → {f}")
         self._log("\nArchivos guardados en: " + str(OUTPUT_DIR))
         names = [f.name for f in files]
-        messagebox.showinfo("Listo", f"Modelo generado.\n\nArchivos en:\n{OUTPUT_DIR}\n\n" + "\n".join(names))
+        has_pth = any(f.suffix.lower() == ".pth" for f in files)
+        msg = f"Modelo generado.\n\nArchivos en:\n{OUTPUT_DIR}\n\n" + "\n".join(names)
+        if not has_pth and files:
+            msg += "\n\n⚠ Falta el .pth (pesos del modelo). Revisa rvc-no-gui/RVC/logs/" + self.model_var.get().strip() + "/"
+        messagebox.showinfo("Listo", msg)
         # Abrir carpeta (Windows)
         if files:
             try:

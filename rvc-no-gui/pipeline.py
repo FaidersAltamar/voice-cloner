@@ -242,6 +242,10 @@ Examples:
     # List command
     subparsers.add_parser("list", help="List available trained models")
 
+    # Ensure-weights: convierte G_*.pth a assets/weights si savee falló
+    ensure_parser = subparsers.add_parser("ensure-weights", help="Convert checkpoint to assets/weights (fallback)")
+    ensure_parser.add_argument("--model-name", "-m", required=True, help="Model name")
+
     # Info command
     subparsers.add_parser("info", help="Show platform and system information")
 
@@ -320,6 +324,10 @@ def main():
                 print(f"  - {model}")
         else:
             print("No trained models found.")
+        return 0
+
+    elif args.command == "ensure-weights":
+        pipeline.trainer._ensure_weights_in_assets(args.model_name)
         return 0
 
     return 0
