@@ -4,16 +4,15 @@ Sube muestras de audio (MP3 o WAV) y obtén tu modelo **.pth** + **.index** para
 
 ---
 
-## Instalación (una vez)
+## Instalación y ejecución (todo en uno)
 
-```powershell
-cd voice-cloner
-powershell -ExecutionPolicy Bypass -File setup.ps1
-```
+**Doble clic en `INSTALAR_Y_EJECUTAR.bat`**
+
+Instala automáticamente Python, Git, FFmpeg (si faltan), dependencias y modelos RVC. La primera vez puede tardar 5-15 min.
 
 ---
 
-## Ejecución
+## Ejecución (si ya está instalado)
 
 **Doble clic en `EJECUTAR_APP.bat`** o:
 

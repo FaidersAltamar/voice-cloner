@@ -1,46 +1,92 @@
-# Voice Cloner - One-Click Setup
-# Run: powershell -ExecutionPolicy Bypass -File setup.ps1
+# Voice Cloner - Instalacion automatica completa
+# Instala Python, Git, FFmpeg si faltan, luego todas las dependencias
+# Ejecutar: powershell -ExecutionPolicy Bypass -File setup.ps1
 
 $ErrorActionPreference = "Stop"
 $ProjectRoot = $PSScriptRoot
 
-Write-Host "=== Voice Cloner Setup ===" -ForegroundColor Cyan
-Write-Host ""
+function Write-Step { param($msg) Write-Host "`n==> $msg" -ForegroundColor Cyan }
+function Write-Ok { param($msg) Write-Host "  [OK] $msg" -ForegroundColor Green }
+function Write-Warn { param($msg) Write-Host "  [!] $msg" -ForegroundColor Yellow }
 
-# Check Python
-if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
-    Write-Host "Python not found. Please install Python 3.10 from https://www.python.org/" -ForegroundColor Red
+Write-Host ""
+Write-Host "============================================" -ForegroundColor Cyan
+Write-Host "   Voice Cloner - Instalacion automatica" -ForegroundColor Cyan
+Write-Host "============================================" -ForegroundColor Cyan
+
+# 1. Python
+Write-Step "Comprobando Python..."
+$pythonCmd = $null
+foreach ($cmd in @("python", "python3", "py")) {
+    try {
+        $v = & $cmd --version 2>&1
+        if ($LASTEXITCODE -eq 0) { $pythonCmd = $cmd; break }
+    } catch {}
+}
+if (-not $pythonCmd) {
+    Write-Warn "Python no encontrado. Intentando instalar con winget..."
+    try {
+        winget install Python.Python.3.11 --accept-package-agreements --accept-source-agreements 2>$null
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        Start-Sleep -Seconds 2
+    } catch {}
+    $pythonCmd = "python"
+}
+if (-not (Get-Command $pythonCmd -ErrorAction SilentlyContinue)) {
+    Write-Host "Python no encontrado. Instalalo desde: https://www.python.org/" -ForegroundColor Red
+    Write-Host "Marca 'Add Python to PATH' durante la instalacion." -ForegroundColor Yellow
     exit 1
 }
+Write-Ok "Python listo"
 
-# Clone rvc-no-gui if not exists
-$RvcPath = Join-Path $ProjectRoot "rvc-no-gui"
-if (-not (Test-Path $RvcPath)) {
-    Write-Host "Cloning rvc-no-gui (headless RVC)..." -ForegroundColor Yellow
-    git clone https://github.com/nakshatra-garg/rvc-no-gui.git $RvcPath
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "Git clone failed. Is Git installed?" -ForegroundColor Red
-        exit 1
-    }
+# 2. Git
+Write-Step "Comprobando Git..."
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    Write-Warn "Git no encontrado. Intentando instalar con winget..."
+    try { winget install Git.Git --accept-package-agreements --accept-source-agreements 2>$null } catch {}
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+}
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    Write-Warn "Git no instalado. Algunas funciones pueden fallar."
 } else {
-    Write-Host "rvc-no-gui already exists." -ForegroundColor Green
+    Write-Ok "Git listo"
 }
 
-# Install dependencies
-Write-Host "Installing dependencies (pydub, flask)..." -ForegroundColor Yellow
-python -m pip install pydub flask -q
+# 3. FFmpeg
+Write-Step "Comprobando FFmpeg..."
+if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
+    Write-Warn "FFmpeg no encontrado. Intentando instalar con winget..."
+    try { winget install Gyan.FFmpeg --accept-package-agreements --accept-source-agreements 2>$null } catch {}
+    $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+}
+if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
+    Write-Warn "FFmpeg no instalado. Necesario para audio."
+} else {
+    Write-Ok "FFmpeg listo"
+}
 
-# Run RVC setup (downloads pretrained models)
-Write-Host "Running RVC setup (downloads models, first time only)..." -ForegroundColor Yellow
+# 4. Dependencias basicas (pydub, flask para la app)
+Write-Step "Instalando dependencias basicas..."
+& $pythonCmd -m pip install --upgrade pip -q
+& $pythonCmd -m pip install pydub flask -q
+Write-Ok "Dependencias basicas instaladas"
+
+# 5. RVC setup (descarga modelos, instala deps de RVC)
+Write-Step "Configurando RVC (descarga modelos, primera vez puede tardar)..."
+$RvcPath = Join-Path $ProjectRoot "rvc-no-gui"
+if (-not (Test-Path $RvcPath)) {
+    Write-Host "  Clonando rvc-no-gui..." -ForegroundColor Yellow
+    git clone https://github.com/nakshatra-garg/rvc-no-gui.git $RvcPath
+}
 Push-Location $RvcPath
-python pipeline.py setup 2>$null
+& $pythonCmd pipeline.py setup 2>&1 | Out-Null
 Pop-Location
+Write-Ok "RVC configurado"
 
 Write-Host ""
-Write-Host "=== Setup Complete ===" -ForegroundColor Green
+Write-Host "============================================" -ForegroundColor Green
+Write-Host "   Instalacion completada" -ForegroundColor Green
+Write-Host "============================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "Start the web interface:" -ForegroundColor Cyan
-Write-Host "  python app.py"
-Write-Host ""
-Write-Host "Then open: http://localhost:7860"
+Write-Host "Ejecuta: EJECUTAR_APP.bat" -ForegroundColor Cyan
 Write-Host ""
