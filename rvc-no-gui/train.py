@@ -251,7 +251,8 @@ class RVCTrainer:
 
             process.wait()
 
-            if process.returncode == 0:
+            # RVC usa os._exit(2333333) al completar con éxito
+            if process.returncode == 0 or process.returncode == 2333333:
                 logger.info("Training completed successfully!")
                 return True
             else:

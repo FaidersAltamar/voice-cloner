@@ -51,11 +51,18 @@ def convert_mp3_to_wav(mp3_path: Path, wav_dir: Path) -> Path:
 
 def find_output_files(model_name: str) -> tuple[Path | None, Path | None]:
     """Busca .pth e .index del modelo."""
+    # 1. assets/weights (formato final procesado por savee)
     weights_file = RVC_DIR / "RVC" / "assets" / "weights" / f"{model_name}.pth"
     pth_file = weights_file if weights_file.exists() else None
+    # 2. Fallback: G_2333333.pth en logs (checkpoint final si savee falló)
+    if not pth_file:
+        g_final = RVC_DIR / "RVC" / "logs" / model_name / "G_2333333.pth"
+        if g_final.exists():
+            pth_file = g_final
+    # 3. Fallback: cualquier G_*.pth en logs del modelo
     if not pth_file:
         for f in (RVC_DIR / "RVC" / "logs").rglob("*.pth"):
-            if model_name in str(f):
+            if model_name in str(f) and "G_" in f.name:
                 pth_file = f
                 break
     index_file = None
