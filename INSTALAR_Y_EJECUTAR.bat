@@ -10,7 +10,7 @@ echo.
 echo Si es la primera vez, instalara todo lo necesario.
 echo (Python, Git, FFmpeg, dependencias, modelos RVC)
 echo.
-echo Esto puede tardar 5-15 minutos la primera vez.
+echo Esto puede tardar 15-40 minutos la primera vez (torch, modelos RVC).
 echo.
 pause
 

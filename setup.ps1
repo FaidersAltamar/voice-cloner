@@ -65,14 +65,15 @@ if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
     Write-Ok "FFmpeg listo"
 }
 
-# 4. Dependencias basicas + RVC minimas (numpy, torch, etc.)
-Write-Step "Instalando dependencias..."
+# 4. Dependencias basicas
+Write-Step "Instalando dependencias basicas (pydub, numpy, scipy)..."
 & $pythonCmd -m pip install --upgrade pip -q
 & $pythonCmd -m pip install pydub flask numpy scipy -q
 Write-Ok "Dependencias basicas instaladas"
 
-# 5. RVC setup (descarga modelos, instala deps de RVC)
-Write-Step "Configurando RVC (descarga modelos, primera vez puede tardar)..."
+# 5. RVC setup (torch, fairseq, etc. - PUEDE TARDAR 15-40 MIN)
+Write-Step "Configurando RVC (torch, modelos... 15-40 min la primera vez)"
+Write-Host "  Si parece colgado, espera: torch tarda 10+ min en descargar." -ForegroundColor Yellow
 $RvcPath = Join-Path $ProjectRoot "rvc-no-gui"
 if (-not (Test-Path $RvcPath)) {
     Write-Host "  Clonando rvc-no-gui..." -ForegroundColor Yellow
