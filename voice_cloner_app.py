@@ -122,7 +122,7 @@ def _parse_progress(line: str, total_epochs: int) -> tuple[int | None, str | Non
     if "dataset preparation completed" in line_lower or "index saved" in line_lower:
         return 60, "Dataset listo"
     if "step 3" in line_lower and "training" in line_lower:
-        return 65, "Entrenando modelo..."
+        return 65, "Entrenando modelo... (CPU: ~3 min/época)"
     # Progreso por época: "Train Epoch: 1 [25%]"
     m = re.search(r"Train Epoch:\s*(\d+)\s*\[(\d+)%\]", line, re.I)
     if m:
@@ -159,8 +159,10 @@ def run_training(model_name: str, wav_files: list[Path], epochs: int, use_gpu: b
         try:
             on_progress("Iniciando entrenamiento...")
             on_progress_bar(0, "Iniciando...")
-            cmd = ["python", str(pipeline), "train", "-m", model_name, "-a"] + [str(f) for f in wav_files] + ["-e", str(epochs), "-d", device]
-            proc = subprocess.Popen(cmd, cwd=str(RVC_DIR), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            cmd = ["python", "-u", str(pipeline), "train", "-m", model_name, "-a"] + [str(f) for f in wav_files] + ["-e", str(epochs), "-d", device]
+            env = os.environ.copy()
+            env["PYTHONUNBUFFERED"] = "1"
+            proc = subprocess.Popen(cmd, cwd=str(RVC_DIR), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, env=env)
             for line in proc.stdout:
                 if line.strip():
                     on_progress(line.strip()[:120])
@@ -196,6 +198,15 @@ def run_training(model_name: str, wav_files: list[Path], epochs: int, use_gpu: b
     threading.Thread(target=_run, daemon=True).start()
 
 
+def _has_cuda() -> bool:
+    """Detecta si hay GPU NVIDIA disponible."""
+    try:
+        import torch
+        return torch.cuda.is_available()
+    except Exception:
+        return False
+
+
 class VoiceClonerApp:
     def __init__(self):
         self.root = tk.Tk()
@@ -229,8 +240,10 @@ class VoiceClonerApp:
         self.model_var = tk.StringVar(value="mi_voz")
         ttk.Entry(opt_frame, textvariable=self.model_var, width=15).pack(side=tk.LEFT, padx=12)
         ttk.Label(opt_frame, text="Épocas:").pack(side=tk.LEFT, padx=4)
-        self.epochs_var = tk.StringVar(value="200")
+        default_epochs = "50" if not _has_cuda() else "200"
+        self.epochs_var = tk.StringVar(value=default_epochs)
         ttk.Entry(opt_frame, textvariable=self.epochs_var, width=6).pack(side=tk.LEFT)
+        ttk.Label(opt_frame, text="(CPU: 50 | GPU: 200)", foreground="gray").pack(side=tk.LEFT, padx=4)
 
         # Dispositivo (GPU/CPU)
         opt2 = ttk.Frame(main)
