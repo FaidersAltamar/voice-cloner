@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Cloner - Sube muestras, obtén .pth + .index</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: #0f0f12;
+            color: #e4e4e7;
+            min-height: 100vh;
+        }
+        h1 {
+            font-size: 1.75rem;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(90deg, #a78bfa, #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .sub { color: #71717a; font-size: 0.9rem; margin-bottom: 2rem; }
+        .zone {
+            border: 2px dashed #3f3f46;
+            border-radius: 12px;
+            padding: 2.5rem;
+            text-align: center;
+            background: #18181b;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .zone:hover, .zone.dragover { border-color: #a78bfa; background: #27272a; }
+        .zone input { display: none; }
+        .zone p { margin: 0; color: #a1a1aa; }
+        .zone strong { color: #e4e4e7; }
+        .row { display: flex; gap: 1rem; margin-top: 1rem; flex-wrap: wrap; }
+        .row label { display: flex; flex-direction: column; gap: 0.25rem; flex: 1; min-width: 140px; }
+        .row input { padding: 0.5rem; border-radius: 6px; border: 1px solid #3f3f46; background: #27272a; color: #fff; }
+        .btn {
+            background: linear-gradient(135deg, #7c3aed, #2563eb);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 1rem;
+            width: 100%;
+            font-size: 1rem;
+        }
+        .btn:hover { opacity: 0.9; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .status {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            border-radius: 8px;
+            background: #27272a;
+            display: none;
+        }
+        .status.show { display: block; }
+        .status.progress { border-left: 4px solid #f59e0b; }
+        .status.done { border-left: 4px solid #22c55e; }
+        .status.error { border-left: 4px solid #ef4444; }
+        .downloads { margin-top: 1rem; }
+        .downloads a {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: #3f3f46;
+            color: #60a5fa;
+            border-radius: 6px;
+            text-decoration: none;
+            margin-right: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .downloads a:hover { background: #52525b; }
+        .file-list { margin-top: 0.5rem; font-size: 0.85rem; color: #71717a; }
+        pre { background: #27272a; padding: 1rem; border-radius: 8px; font-size: 0.8rem; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Voice Cloner</h1>
+    <p class="sub">Sube muestras de audio (MP3 o WAV) y obtén tu modelo .pth + .index para voice-changer</p>
+
+    <form id="form" enctype="multipart/form-data">
+        <div class="zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+            <input type="file" id="fileInput" name="files" multiple accept=".mp3,.wav">
+            <p><strong>Arrastra archivos aquí</strong> o haz clic para seleccionar</p>
+            <p>MP3 o WAV · 10-30 min de voz limpia recomendado</p>
+            <div class="file-list" id="fileList"></div>
+        </div>
+
+        <div class="row">
+            <label>
+                Nombre del modelo
+                <input type="text" name="model_name" value="mi_voz" placeholder="mi_voz">
+            </label>
+            <label>
+                Épocas (200-400)
+                <input type="number" name="epochs" value="200" min="100" max="500">
+            </label>
+        </div>
+
+        <button type="submit" class="btn" id="submitBtn">Entrenar y generar .pth + .index</button>
+    </form>
+
+    <div class="status" id="status">
+        <div id="statusText"></div>
+        <div class="downloads" id="downloads"></div>
+    </div>
+
+    <details style="margin-top:2rem; color:#71717a; font-size:0.85rem">
+        <summary>Test desde consola (F12)</summary>
+        <p>1. Selecciona un archivo arriba. 2. Abre consola (F12). 3. Pega y ejecuta:</p>
+        <pre>document.getElementById('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));</pre>
+    </details>
+
+    <script>
+        const zone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileList = document.getElementById('fileList');
+        const form = document.getElementById('form');
+        const submitBtn = document.getElementById('submitBtn');
+        const status = document.getElementById('status');
+        const statusText = document.getElementById('statusText');
+        const downloads = document.getElementById('downloads');
+
+        zone.ondragover = (e) => { e.preventDefault(); zone.classList.add('dragover'); };
+        zone.ondragleave = () => zone.classList.remove('dragover');
+        zone.ondrop = (e) => {
+            e.preventDefault();
+            zone.classList.remove('dragover');
+            fileInput.files = e.dataTransfer.files;
+            updateFileList();
+        };
+        fileInput.onchange = updateFileList;
+
+        function updateFileList() {
+            const files = fileInput.files;
+            fileList.textContent = files.length ? `${files.length} archivo(s) seleccionado(s)` : '';
+        }
+
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            if (!fileInput.files.length) {
+                alert('Selecciona al menos un archivo MP3 o WAV');
+                return;
+            }
+            submitBtn.disabled = true;
+            status.className = 'status show progress';
+            statusText.textContent = 'Subiendo y convirtiendo...';
+            downloads.innerHTML = '';
+
+            const fd = new FormData(form);
+
+            try {
+                const r = await fetch('/upload', {
+                    method: 'POST',
+                    body: fd,
+                    headers: {}
+                });
+                let data = {};
+                try { data = await r.json(); } catch (_) { data = { error: 'Respuesta inválida del servidor' }; }
+                if (!r.ok) {
+                    const msg = data.error || (Array.isArray(data.keys) ? 'Claves: ' + data.keys.join(', ') : '') || `Error ${r.status}`;
+                    throw new Error(msg || 'Error en el servidor');
+                }
+                statusText.textContent = 'Entrenamiento iniciado. Esto puede tardar 20-60 minutos...';
+                pollStatus(data.job_id, data.model_name);
+            } catch (err) {
+                status.className = 'status show error';
+                statusText.textContent = err.message;
+                submitBtn.disabled = false;
+            }
+        };
+
+        async function pollStatus(jobId, modelName) {
+            const int = setInterval(async () => {
+                const r = await fetch('/status');
+                const s = await r.json();
+                statusText.textContent = s.progress || 'Procesando...';
+                if (s.error) {
+                    clearInterval(int);
+                    status.className = 'status show error';
+                    statusText.textContent = 'Error: ' + s.error;
+                    submitBtn.disabled = false;
+                    return;
+                }
+                if (s.done) {
+                    clearInterval(int);
+                    status.className = 'status show done';
+                    statusText.textContent = '¡Listo! Descarga tus archivos:';
+                    const filesR = await fetch(`/outputs/${jobId}`);
+                    const { files } = await filesR.json();
+                    downloads.innerHTML = (files || []).map(f =>
+                        `<a href="/download/${jobId}/${f}" download>${f}</a>`
+                    ).join('');
+                    submitBtn.disabled = false;
+                }
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

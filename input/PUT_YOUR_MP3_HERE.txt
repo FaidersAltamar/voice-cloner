@@ -1,0 +1,4 @@
+Put your MP3 audio samples here.
+- 10-30 minutes total of clean voice (no music, no background noise)
+- Multiple files OK
+- Then run: python convert_mp3_to_wav.py

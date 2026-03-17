@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head><title>Test Upload</title></head>
+<body>
+<h1>Test Upload desde consola</h1>
+<p>Abre la consola del navegador (F12) y pega este codigo:</p>
+<pre id="code"></pre>
+<script>
+const code = `
+// Pegar en consola (F12) con la pagina http://127.0.0.1:7860 abierta
+const fileInput = document.querySelector('input[type=file]');
+const file = new File(
+  [await (await fetch('file:///c:/Users/faide/Downloads/1773696427421.mp3')).blob()],
+  '1773696427421.mp3',
+  { type: 'audio/mpeg' }
+);
+// Nota: fetch a file:// no funciona por CORS. Usa el boton de seleccionar archivo.
+// O ejecuta en consola:
+const fd = new FormData();
+fd.append('model_name', 'mi_voz');
+fd.append('epochs', '200');
+// Luego selecciona el archivo manualmente y:
+document.querySelector('input[type=file]').onchange = async () => {
+  const fd = new FormData(document.getElementById('form'));
+  const r = await fetch('/upload', { method: 'POST', body: fd });
+  console.log('Status:', r.status, await r.json());
+};
+`;
+document.getElementById('code').textContent = code;
+</script>
+<hr>
+<p><strong>Mas simple:</strong> Abre http://127.0.0.1:7860, selecciona el archivo, haz clic en Entrenar. Si falla, mira la consola (F12) y la terminal del servidor.</p>
+</body>
+</html>
