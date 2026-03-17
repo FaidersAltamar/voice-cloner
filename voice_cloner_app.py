@@ -51,25 +51,41 @@ def convert_mp3_to_wav(mp3_path: Path, wav_dir: Path) -> Path:
 
 def find_output_files(model_name: str) -> tuple[Path | None, Path | None]:
     """Busca .pth e .index del modelo."""
-    # 1. assets/weights (formato final procesado por savee)
-    weights_file = RVC_DIR / "RVC" / "assets" / "weights" / f"{model_name}.pth"
-    pth_file = weights_file if weights_file.exists() else None
-    # 2. Fallback: G_2333333.pth en logs (checkpoint final si savee falló)
-    if not pth_file:
-        g_final = RVC_DIR / "RVC" / "logs" / model_name / "G_2333333.pth"
+    rvc_base = RVC_DIR / "RVC"
+    logs_model = rvc_base / "logs" / model_name
+    weights_dir = rvc_base / "assets" / "weights"
+
+    # 1. .pth: assets/weights (formato final)
+    pth_file = (weights_dir / f"{model_name}.pth") if (weights_dir / f"{model_name}.pth").exists() else None
+    # 2. Fallback: G_2333333.pth en logs
+    if not pth_file and logs_model.exists():
+        g_final = logs_model / "G_2333333.pth"
         if g_final.exists():
             pth_file = g_final
-    # 3. Fallback: cualquier G_*.pth en logs del modelo
-    if not pth_file:
-        for f in (RVC_DIR / "RVC" / "logs").rglob("*.pth"):
-            if model_name in str(f) and "G_" in f.name:
-                pth_file = f
-                break
+    # 3. Fallback: último G_*.pth por número de época
+    if not pth_file and logs_model.exists():
+        g_files = list(logs_model.glob("G_*.pth"))
+        if g_files:
+            def _epoch_num(p: Path) -> int:
+                try:
+                    return int(p.stem.split("_")[1])
+                except (IndexError, ValueError):
+                    return 0
+            pth_file = max(g_files, key=_epoch_num)
+
+    # .index: preferir added_* sobre trained_* (added es el que usa inference)
     index_file = None
-    for f in (RVC_DIR / "RVC").rglob("*.index"):
-        if model_name in str(f):
-            index_file = f
-            break
+    added, trained, other = [], [], []
+    for f in rvc_base.rglob("*.index"):
+        if model_name not in str(f):
+            continue
+        if "added_" in f.name:
+            added.append(f)
+        elif "trained_" in f.name:
+            trained.append(f)
+        else:
+            other.append(f)
+    index_file = added[0] if added else (trained[0] if trained else (other[0] if other else None))
     return pth_file, index_file
 
 

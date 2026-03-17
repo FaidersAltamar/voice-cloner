@@ -176,6 +176,40 @@ class RVCTrainer:
         logger.info(f"Config copied to: {config_save_path}")
         return True
 
+    def _ensure_weights_in_assets(self, model_name: str) -> None:
+        """Si savee falló, convertir G_*.pth a assets/weights para que voice_cloner lo encuentre."""
+        import shutil
+        weights_path = self.paths.get_model_weights_path(model_name)
+        if weights_path.exists():
+            return
+        exp_dir = self.paths.get_model_logs_dir(model_name)
+        g_final = exp_dir / "G_2333333.pth"
+        if not g_final.exists():
+            g_files = sorted(exp_dir.glob("G_*.pth"), key=lambda x: int(x.stem.split("_")[1]) if x.stem.split("_")[1].isdigit() else 0)
+            g_final = g_files[-1] if g_files else None
+        if not g_final or not g_final.exists():
+            return
+        orig_cwd = os.getcwd()
+        try:
+            rvc_dir = str(self.paths.rvc_dir)
+            if rvc_dir not in sys.path:
+                sys.path.insert(0, rvc_dir)
+            os.chdir(rvc_dir)
+            from infer.lib.train.process_ckpt import extract_small_model
+            sr = self.training_config.sample_rate
+            version = self.training_config.version
+            if_f0 = 1 if self.training_config.use_f0 else 0
+            ckpt_path = str(g_final.resolve())
+            result = extract_small_model(ckpt_path, model_name, sr, if_f0, "final", version)
+            if result == "Success.":
+                logger.info(f"Converted {g_final.name} -> assets/weights/{model_name}.pth (savee fallback)")
+            else:
+                logger.warning(f"extract_small_model failed: {result}")
+        except Exception as e:
+            logger.warning(f"Could not convert checkpoint to assets/weights: {e}. Voice Cloner will use G_*.pth from logs.")
+        finally:
+            os.chdir(orig_cwd)
+
     def _run_training(
         self,
         model_name: str,
@@ -254,6 +288,8 @@ class RVCTrainer:
             # RVC usa os._exit(2333333) al completar con éxito
             if process.returncode == 0 or process.returncode == 2333333:
                 logger.info("Training completed successfully!")
+                # Si savee falló, convertir G_2333333.pth a assets/weights
+                self._ensure_weights_in_assets(model_name)
                 return True
             else:
                 logger.error(f"Training failed with return code: {process.returncode}")
