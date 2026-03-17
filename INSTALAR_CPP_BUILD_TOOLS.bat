@@ -2,7 +2,7 @@
 title Instalar C++ Build Tools
 echo.
 echo Este script instala Microsoft C++ Build Tools.
-echo Necesario para compilar fairseq y pyworld en Windows.
+echo Solo necesario si el wheel precompilado de fairseq falla (p. ej. red).
 echo.
 echo IMPORTANTE: Ejecuta este archivo como Administrador
 echo (clic derecho - Ejecutar como administrador)

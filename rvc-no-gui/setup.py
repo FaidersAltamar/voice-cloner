@@ -475,8 +475,13 @@ class RVCSetup:
         except Exception as e:
             logger.warning(f"Could not adjust pip version: {e}")
 
+    # Wheel precompilado de fairseq para Windows + Python 3.11 (evita C++ Build Tools)
+    FAIRSEQ_WHEEL_WIN_CP311 = (
+        "https://huggingface.co/Jmica/rvc/resolve/main/fairseq-0.12.4-cp311-cp311-win_amd64.whl"
+    )
+
     def _patch_requirements_for_py311(self, requirements_file: Path) -> None:
-        """Patch requirements.txt for Python 3.11 compatibility (numba, llvmlite, pyworld)."""
+        """Patch requirements.txt for Python 3.11 compatibility (numba, llvmlite, pyworld, fairseq)."""
         try:
             content = requirements_file.read_text(encoding="utf-8")
             original = content
@@ -486,11 +491,31 @@ class RVCSetup:
             if sys.platform == "win32" and "pyworld==" in content:
                 content = content.replace("pyworld==0.3.2", "pyworld-prebuilt>=0.3.0")
                 logger.info("Patched pyworld -> pyworld-prebuilt (no C++ build needed)")
+            # fairseq 0.12.2 requiere compilación C++ en Windows; usar wheel precompilado
+            if sys.platform == "win32" and "fairseq==" in content:
+                content = content.replace("fairseq==0.12.2", "# fairseq: installed via pre-built wheel")
+                logger.info("Patched fairseq -> will use pre-built wheel (no C++ build needed)")
             if content != original:
                 requirements_file.write_text(content, encoding="utf-8")
                 logger.info("Patched requirements.txt for Python 3.11 compatibility")
         except Exception as e:
             logger.warning(f"Could not patch requirements for Python 3.11: {e}")
+
+    def _install_fairseq_wheel_win_cp311(self) -> bool:
+        """Install fairseq from pre-built wheel on Windows + Python 3.11 (avoids C++ Build Tools)."""
+        if sys.platform != "win32" or sys.version_info < (3, 11):
+            return True
+        try:
+            logger.info("Installing fairseq from pre-built wheel (no C++ build needed)...")
+            pip_args = [sys.executable, "-m", "pip", "install", self.FAIRSEQ_WHEEL_WIN_CP311]
+            if sys.platform == "win32":
+                pip_args.append("--user")
+            subprocess.run(pip_args, check=True)
+            logger.info("fairseq wheel installed successfully")
+            return True
+        except subprocess.CalledProcessError as e:
+            logger.warning(f"Pre-built fairseq wheel failed: {e}. Will try building from source (requires C++ Build Tools).")
+            return False
 
     def _install_dependencies(self) -> bool:
         """Install Python dependencies."""
@@ -502,6 +527,10 @@ class RVCSetup:
 
         # pip 24.1+ rejects omegaconf 2.0.x (required by fairseq); downgrade if needed
         self._ensure_pip_for_fairseq()
+
+        # Windows + Python 3.11: instalar fairseq desde wheel precompilado ANTES del resto
+        if sys.platform == "win32" and sys.version_info >= (3, 11):
+            self._install_fairseq_wheel_win_cp311()
 
         logger.info("Installing Python dependencies...")
         pip_args = [sys.executable, "-m", "pip", "install", "-r", str(requirements_file)]
