@@ -20,9 +20,10 @@ echo.
 powershell -ExecutionPolicy Bypass -File "%~dp0setup.ps1"
 if errorlevel 1 (
     echo.
-    echo Error en la instalacion.
-    pause
-    exit /b 1
+    echo Hubo problemas en la instalacion. Revisa los mensajes arriba.
+    echo.
+    set /p continuar="Intentar abrir la app de todos modos? (S/N): "
+    if /i not "%continuar%"=="S" exit /b 1
 )
 
 echo.

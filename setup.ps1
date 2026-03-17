@@ -78,10 +78,17 @@ if (-not (Test-Path $RvcPath)) {
     Write-Host "  Clonando rvc-no-gui..." -ForegroundColor Yellow
     git clone https://github.com/nakshatra-garg/rvc-no-gui.git $RvcPath
 }
-Push-Location $RvcPath
-& $pythonCmd pipeline.py setup 2>&1 | Out-Null
-Pop-Location
-Write-Ok "RVC configurado"
+if (-not (Test-Path (Join-Path $RvcPath "pipeline.py"))) {
+    Write-Host "  Error: rvc-no-gui no tiene pipeline.py. Verifica la carpeta." -ForegroundColor Red
+} else {
+    # Usar Start-Process para evitar NativeCommandError cuando Python escribe a stderr
+    $p = Start-Process -FilePath $pythonCmd -ArgumentList "pipeline.py","setup" -WorkingDirectory $RvcPath -Wait -NoNewWindow -PassThru
+    if ($p.ExitCode -ne 0) {
+        Write-Warn "RVC setup fallo (codigo $($p.ExitCode)). Ejecuta manualmente: cd rvc-no-gui; python pipeline.py setup"
+    } else {
+        Write-Ok "RVC configurado"
+    }
+}
 
 Write-Host ""
 Write-Host "============================================" -ForegroundColor Green
