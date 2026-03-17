@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+
+# Datos generados
+uploads/
+output/
+input/
+*.pth
+*.index
+
+# Logs y temporales
+*.log
+temp_DG/
+*_backup_*/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# RVC assets generados (se crean al entrenar)
+rvc-no-gui/RVC/logs/
+rvc-no-gui/RVC/assets/weights/*.pth
+rvc-no-gui/dataset/
+rvc-no-gui/temp_DG/
