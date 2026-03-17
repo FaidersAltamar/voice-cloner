@@ -65,10 +65,10 @@ if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
     Write-Ok "FFmpeg listo"
 }
 
-# 4. Dependencias basicas (pydub, flask para la app)
-Write-Step "Instalando dependencias basicas..."
+# 4. Dependencias basicas + RVC minimas (numpy, torch, etc.)
+Write-Step "Instalando dependencias..."
 & $pythonCmd -m pip install --upgrade pip -q
-& $pythonCmd -m pip install pydub flask -q
+& $pythonCmd -m pip install pydub flask numpy scipy -q
 Write-Ok "Dependencias basicas instaladas"
 
 # 5. RVC setup (descarga modelos, instala deps de RVC)
@@ -84,7 +84,13 @@ if (-not (Test-Path (Join-Path $RvcPath "pipeline.py"))) {
     # Usar Start-Process para evitar NativeCommandError cuando Python escribe a stderr
     $p = Start-Process -FilePath $pythonCmd -ArgumentList "pipeline.py","setup" -WorkingDirectory $RvcPath -Wait -NoNewWindow -PassThru
     if ($p.ExitCode -ne 0) {
-        Write-Warn "RVC setup fallo (codigo $($p.ExitCode)). Ejecuta manualmente: cd rvc-no-gui; python pipeline.py setup"
+        Write-Warn "RVC setup fallo. Instalando dependencias RVC manualmente..."
+        $rvcReq = Join-Path $RvcPath "RVC\requirements.txt"
+        if (Test-Path $rvcReq) {
+            & $pythonCmd -m pip install -r $rvcReq -q 2>$null
+            Write-Ok "Dependencias RVC instaladas"
+        }
+        Write-Warn "Ejecuta manualmente si hay mas errores: cd rvc-no-gui; python pipeline.py setup"
     } else {
         Write-Ok "RVC configurado"
     }
